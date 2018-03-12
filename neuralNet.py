@@ -7,6 +7,7 @@ from sklearn import preprocessing, model_selection
 import sys
 from matplotlib import pyplot as plt
 
+testSet = []
 
 def convertLabel(lab):
     ar = np.zeros(2)
@@ -15,6 +16,8 @@ def convertLabel(lab):
 
 #preprocessing 
 def getData(split=True):
+    global testSet
+    #get raw data into list of sequences
     positives = []
     with open("rap1-lieb-positives.txt") as f:
         for line in f.readlines():
@@ -28,7 +31,11 @@ def getData(split=True):
             continue
         negatives.append(str(seq1))
 
-   
+    tests = []
+    with open("rap1-lieb-test.txt", 'r') as f:
+        for line in f.readlines():
+            tests.append(line.rstrip('\n'))
+
 
     #purge negatives that have a positive seq in it
     cleanedNegatives = []
@@ -42,63 +49,60 @@ def getData(split=True):
             cleanedNegatives.append(negSeq)
     negatives = cleanedNegatives #3164 sequences to 3099
 
+    #write negatives to text file
     with open("cleaned_negatives.txt", "w") as f:
         for neg in negatives:
             f.write(str(neg))
             f.write("\n")
 
-    def encode(seq, isPositive):
+    def encode(seq, isShort):
         mapp = {'A':1, 'C':2, 'G':3, 'T':4}
         l = []
         for char in seq:
             l.append(mapp[char])
         
-        if isPositive:
+        if isShort:
             l *= 58
             l += l[0:14]
         return l
 
-
+    #encode sequences as vectors 
     encodedPos = []
     for seq in positives:
         encoded = encode(seq, True)
-        if len(encoded) != 1000:
-            print("wtf")
         encodedPos.append(encoded)
 
     encodedNeg = []
     for seq in negatives:
         encoded = encode(seq, False)
-        if len(encoded) != 1000:
-            print("wtf")
         encodedNeg.append(encoded)
 
-    for i in encodedNeg:
-        if len(i) != 1000:
-            print("blah")
-    # encodedPos = np.asarray(encodedPos)
-    # encodedNeg = np.asarray(encodedNeg)
+    #get test set into same format 
+    encodedTests = []
+    for seq in tests:
+        encoded = encode(seq, True)
+        encodedTests.append(encoded)
+    encodedTests = np.array(encodedTests, np.int32)
+    xFict = np.ones((len(encodedTests), 1001))
+    xFict[:,:-1] = encodedTests
+    testSet = np.copy(xFict)
 
+    #set up for training and validation    
     X = []
     y = []
     for el in encodedPos:
         X.append(el)
         y.append(convertLabel(1))
-    ## random.shuffle(encodedNeg)
-    # for el in encodedNeg[0:137]: 
-    #     X.append(el)
-    #     y.append(0)
+    
     randomNegs = random.sample(encodedNeg, 137) #training will be 274 total sequences (half positive half negative), negatives will be chosen randomly
     for el in randomNegs:
         X.append(el)
         y.append(convertLabel(0))
 
     X = np.array(X, np.int32)
-    print("SSSS", type(X), X.shape)
     y = np.array(y)
 
     #add fictitious dimension
-    print("shape", X.shape)
     xFict = np.ones((len(X), 1001))
     xFict[:,:-1] = X
     X = np.copy(xFict)
@@ -214,9 +218,9 @@ class Neural_Network(object):
 
 
     def trainNeuralNetwork(self, images, labels, validation, validationLabels, costType):
-        print("V: ", self.V)
-        print("W: ", self.W)
-        print("lengths: ", len(images), len(labels), len(validation))
+        # print("V: ", self.V)
+        # print("W: ", self.W)
+        # print("lengths: ", len(images), len(labels), len(validation))
         errorRate = 1
         decayStart = -1
         DONE = False
@@ -266,8 +270,8 @@ class Neural_Network(object):
                 print("iteration: ", iters, "epsilon: ", epsilon, " val error rate: ", mistakes / float(len(preds)))
                 validationAccuracies.append(1 - errorRate)
             
-            if errorRate < .01:
-                print("less than .01 error")
+            if errorRate < .003:
+                print("less than .003 error")
                 break
 
             if iters % 10 == 0:
@@ -318,14 +322,18 @@ class Neural_Network(object):
         
         return self.V, self.W
 
-    def predict(self, weights, images):
+    def predict(self, weights, images, getProbTrue=False):
         """
-        returns predictions as integers
+        returns predictions as integers (binary classification) if getProbTrue = False
+        else will return predictions as a list of probabilities of being a 1 (positive result)
         """
         predictions = []
         for image in images:
             pred = self.forward(image, False)
-            predictions.append(np.argmax(pred)) #arg min? 
+            if getProbTrue:
+                predictions.append(pred[1])
+            else:
+                predictions.append(np.argmax(pred)) #arg min? 
         return predictions
         #     maxi = float('-inf')
         #     digit = -1
@@ -362,7 +370,6 @@ def crossValidate():
     X, y = getData(False)
     kf = model_selection.KFold(n_splits=10, random_state=None, shuffle=False)
     for train_index, test_index in kf.split(X):
-        print("TRAIN:", train_index, "TEST:", test_index)
         X_train, X_test = X[train_index], X[test_index]
         y_train, y_test = y[train_index], y[test_index]
         NN = Neural_Network()
@@ -376,13 +383,25 @@ def crossValidate():
 
 
 
-def predictOnTestSet(NN):
-    return 
+def predictOnTestSet():
+    """
+    write output of test predictions to file "testPredictions.txt"
+    """
+    global testSet
+    training, validation, trainingLabels, validationLabels = getData(True)
+    NN = Neural_Network()
+    NN.trainNeuralNetwork(training, trainingLabels, validation, validationLabels, "squared")
+    testPredictions = NN.predict("", testSet, getProbTrue=True)
+    with open("testPredictions.txt", "w") as f:
+        with open("rap1-lieb-test.txt", "r") as t:
+            i = 0
+            for line in t.readlines():
+                f.write(line.rstrip('\n') + '\t' + str(testPredictions[i]) + '\n')
+                i+=1
 
-
-NN = validate("squared")
+# NN = validate("squared")
 # crossValidate()
-
+predictOnTestSet()
 
 
 
