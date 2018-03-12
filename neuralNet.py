@@ -63,7 +63,6 @@ def getData(split=True):
         l = []
         for char in seq:
             l.append(mapp[char])
-        
         if isShort:
             l *= 58
             l += l[0:14]
@@ -77,7 +76,15 @@ def getData(split=True):
 
     encodedNeg = []
     for seq in negatives:
-        encoded = encode(seq, False)
+        
+        #maybe neural net will just pick up on if seq consists of repeats of length 17! 
+        #get a random 17bp seq in the negative and repeat it
+        rand = random.randint(0, len(seq) - 18)
+        seq = seq[rand: rand + 17] 
+        encoded = encode(seq, True) 
+        
+        # encoded = encode(seq, False)
+       
         encodedNeg.append(encoded)
 
     #get test set into same format 
@@ -97,7 +104,7 @@ def getData(split=True):
         X.append(el)
         y.append(convertLabel(1))
 
-    randomNegs = random.sample(encodedNeg, 137) #137#training will be 274 total sequences (half positive half negative), negatives will be chosen randomly
+    randomNegs = random.sample(encodedNeg, 137) #training will be 274 total sequences (half positive half negative), negatives will be chosen randomly
     for el in randomNegs:
         X.append(el)
         y.append(convertLabel(0))
@@ -116,7 +123,7 @@ def getData(split=True):
     if split == False:
         return X, y
     else:
-        X_train, X_test, y_train, y_test = model_selection.train_test_split(X, y, test_size=.1, random_state=42)
+        X_train, X_test, y_train, y_test = model_selection.train_test_split(X, y, test_size=.10, random_state=42)
         return X_train, X_test, y_train, y_test
 
 
@@ -126,7 +133,7 @@ class Neural_Network(object):
         #Define Hyperparameters
         self.inputLayerSize = 1000 + 1
         self.outputLayerSize = 2
-        self.hiddenLayerSize =  200 + 1
+        self.hiddenLayerSize = 200 + 1
 
         #define layers and activations
         self.x = [] #input layer
@@ -138,8 +145,6 @@ class Neural_Network(object):
         #Weights (parameters)
         self.V = np.random.normal(0, .01, (1001, self.hiddenLayerSize - 1))
         self.W = np.random.normal(0, .01, (self.hiddenLayerSize, 2))
-        # self.V = np.load("V3.npy")
-        # self.W = np.load("W3.npy")
 
     def sigmoid(self, z):
     #Apply sigmoid activation function to scalar, vector, or matrix
@@ -220,23 +225,22 @@ class Neural_Network(object):
         return dJdV, dJdW #dV is mostly 0s
 
 
-    def trainNeuralNetwork(self, images, labels, validation, validationLabels, costType):
+    def trainNeuralNetwork(self, images, labels, validation, validationLabels, costType,verbose=True):
         # print("V: ", self.V)
         # print("W: ", self.W)
         # print("lengths: ", len(images), len(labels), len(validation))
         errorRate = 1
-        decayStart = -1
         DONE = False
         iters = 0
         epsilon =  0.1
+        newThresh = .20
         trainingErrors = []
         itersList = []
         validationAccuracies = []
         costs = []
         cardinality = 274
-        while iters < cardinality * 1000: 
-            # print('xiters', iters)
-            #STOCHASTIC SINGLE IMAGE
+        while iters < cardinality * 50: 
+            #STOCHASTIC SINGLE sequence
             sample = images[iters % len(images)] 
             y = labels[iters % len(images)] 
             if costType == "squared":
@@ -246,78 +250,56 @@ class Neural_Network(object):
             self.V = self.V - float(epsilon) * dv #subtract every element in vector v by dv
             self.W = self.W - float(epsilon) * dw #subtract every element in vector w by dw
             iters += 1
-            decayStart += 1
             
-            if DONE == False and errorRate < .20:
-                epsilon = epsilon * .6
-                DONE = True
-                decayStart = 1
-
-
-            # if DONE == True and (decayStart % (5 * cardinality) == 0):
+            # if DONE == False and errorRate < .20:
             #     epsilon = epsilon * .6
-            
-            # if costType == "entropy" and errorRate < .11:
-            #     epsilon = .01
+            #     DONE = True
+            if errorRate < newThresh:
+                epsilon = epsilon * .6
+                newThresh -= .05
+                DONE = True 
+
            
             if iters % 10 == 0:
             # if iters % cardinality == 0:
                 preds = self.predict("", validation)
-                print(preds)
                 mistakes = 0
                 for i in range(0, len(preds)):
-
                     if preds[i] != np.argmax(validationLabels[i]):
                         mistakes += 1
                 errorRate = mistakes / float(len(preds))
-                print("iteration: ", iters, "epsilon: ", epsilon, " val error rate: ", mistakes / float(len(preds)))
+                if verbose == True:
+                    print(preds)
+                    print("iteration: ", iters, "epsilon: ", epsilon, " val error rate: ", mistakes / float(len(preds)))
                 validationAccuracies.append(1 - errorRate)
             
-            if errorRate < .0003:
-                print("less than .0003 error")
-                break
+            if errorRate < .036:
+                print("less than .036 validation error")
+                avg = crossValidate(self, verbose=False)
+                if avg < .067:
+                    break
 
-            if iters % 10 == 0:
-            # if iters % cardinality  == 0:
-                preds = self.predict("", images)
-                mistakes = 0
-                for i in range(0, len(preds)):
-                    if preds[i] != np.argmax(labels[i]):
-                        mistakes += 1
-                errorRate = mistakes / float(len(preds))
-                print("iteration: ", iters, "epsilon: ", epsilon, " training error rate: ", mistakes / float(len(preds)))
-                trainingErrors.append(errorRate)
-                itersList.append(iters)
 
-            # if iters % cardinality == 0:
-            if iters % 10 == 0:
-                if costType == "squared":
-                    cost = self.costFunction(images, labels)
-                    costs.append(cost)
-                else:
-                    cost = self.crossEntropyCost(images, labels) #PASSING IN ALL IMAGES TO COMPUTE COST
-                    costs.append(cost)
-                print("COST", cost) 
+            # if iters % 10 == 0:
+            #     if costType == "squared":
+            #         cost = self.costFunction(images, labels)
+            #         costs.append(cost)
+            #     else:
+            #         cost = self.crossEntropyCost(images, labels) #PASSING IN ALL IMAGES TO COMPUTE COST
+            #         costs.append(cost)
+            #     if verbose == True:
+                    # print("COST", cost) 
 
+
+            #resample training data to include different negatives each epoch
             if iters % cardinality == 0:
-                images, validation, labels, validationLabels = getData(True)
-
-        # plt.xlabel("iteration")
-        # plt.ylabel("cost")
-        # plt.plot(itersList, costs, 'ro')
-        # plt.show()
-
-        # plt.xlabel("iteration")
-        # plt.ylabel("training error")
-        # plt.plot(itersList, trainingErrors, 'ro')
-        # plt.show()
-
-        # plt.xlabel("iteration")
-        # plt.ylabel("validation accuracy")
-        # plt.plot(itersList, validationAccuracies, 'ro')
-        # plt.show()
-
-        
+                images, null, labels, null = getData(True)
+            
+            if iters % (cardinality/2) == 0:
+                print("epsilon", epsilon)
+                avg = crossValidate(self, verbose=False)
+                if avg < .067:
+                    break
         return self.V, self.W
 
     def predict(self, weights, images, getProbTrue=False):
@@ -339,55 +321,50 @@ class Neural_Network(object):
                 predictions.append(np.argmax(pred)) #arg min? 
         # print("COUNTS", counts/float(len(predictions)))
         return predictions
-        
 
-
-
-def validate(costType):
-
+def getNN(costType):
     training, validation, trainingLabels, validationLabels = getData(True)
     if costType == "squared":
         NN = Neural_Network()
-        NN.trainNeuralNetwork(training, trainingLabels, validation, validationLabels, "squared")
+        NN.trainNeuralNetwork(training, trainingLabels, validation, validationLabels, "squared", verbose=True)
     else:
         NN = Neural_Network()
-        NN.trainNeuralNetwork(training, trainingLabels, validation, validationLabels, "entropy")
+        NN.trainNeuralNetwork(training, trainingLabels, validation, validationLabels, "entropy", verbose=False)
 
     predictions = NN.predict("", validation)
     mistakes = 0
     for i in range(0, len(predictions)):
         if predictions[i] != np.argmax(validationLabels[i]):
             mistakes += 1
-    print("error rate: ", mistakes / float(len(predictions)))
+    print("final error rate on validation: ", mistakes / float(len(predictions)))
+    crossValidate(NN, False)
     return NN
 
-
-def crossValidate():
-
-    X, y = getData(False)
-    kf = model_selection.KFold(n_splits=10, random_state=None, shuffle=False)
+def crossValidate(NN, verbose=False):
+    """
+    performs cross validation with an input neural network, prints results
+    """
+    folds = []
+    X, y = getData(split=False)
+    kf = model_selection.KFold(n_splits=10, random_state=None, shuffle=True)
     for train_index, test_index in kf.split(X):
         X_train, X_test = X[train_index], X[test_index]
         y_train, y_test = y[train_index], y[test_index]
-        NN = Neural_Network()
-        NN.trainNeuralNetwork(X_train, y_train, X_test, y_test, "squared")
         predictions = NN.predict("", X_test)
         mistakes = 0
         for i in range(0, len(predictions)):
             if predictions[i] != np.argmax(y_test[i]):
                 mistakes += 1
-        print("k fold error rate: ", mistakes / float(len(predictions)))
-
-
+        folds.append(mistakes / float(len(predictions)))
+    print("average k fold", np.average(folds))
+    return np.average(folds)
 
 def predictOnTestSet():
     """
     write output of test predictions to file "predictions.txt"
     """
     global testSet
-    training, validation, trainingLabels, validationLabels = getData(True)
-    NN = Neural_Network()
-    NN.trainNeuralNetwork(training, trainingLabels, validation, validationLabels, "squared")
+    NN = getNN("squared")
     testPredictions = NN.predict("", testSet, getProbTrue=True)
     with open("predictions.txt", "w") as f:
         with open("rap1-lieb-test.txt", "r") as t:
@@ -396,11 +373,18 @@ def predictOnTestSet():
                 f.write(line.rstrip('\n') + '\t' + str(testPredictions[i]) + '\n')
                 i+=1
 
-# NN = validate("squared")
+NN = getNN("squared")
 # crossValidate()
-predictOnTestSet()
+# predictOnTestSet()
 
+# Notes:
+# 274 total size of set (training + validation test)
+# with validation/test set size of 10%, 1 seq error = .0375 error rate
 
+# predictions file rn:
+# average k fold 0.06190476190476191
+# final error rate on validation:  0.10714285714285714
+# average k fold 0.08082010582010582
 
 
 
