@@ -10,6 +10,9 @@ from matplotlib import pyplot as plt
 testSet = []
 
 def convertLabel(lab):
+    """
+    converts a label (0 or 1) to a vector of length 2, with a 1 being in index {label}
+    """
     ar = np.zeros(2)
     ar[lab] = 1
     return ar
@@ -93,8 +96,8 @@ def getData(split=True):
     for el in encodedPos:
         X.append(el)
         y.append(convertLabel(1))
-    
-    randomNegs = random.sample(encodedNeg, 137) #training will be 274 total sequences (half positive half negative), negatives will be chosen randomly
+
+    randomNegs = random.sample(encodedNeg, 137) #137#training will be 274 total sequences (half positive half negative), negatives will be chosen randomly
     for el in randomNegs:
         X.append(el)
         y.append(convertLabel(0))
@@ -113,7 +116,7 @@ def getData(split=True):
     if split == False:
         return X, y
     else:
-        X_train, X_test, y_train, y_test = model_selection.train_test_split(X, y, test_size=.30, random_state=42)
+        X_train, X_test, y_train, y_test = model_selection.train_test_split(X, y, test_size=.1, random_state=42)
         return X_train, X_test, y_train, y_test
 
 
@@ -270,8 +273,8 @@ class Neural_Network(object):
                 print("iteration: ", iters, "epsilon: ", epsilon, " val error rate: ", mistakes / float(len(preds)))
                 validationAccuracies.append(1 - errorRate)
             
-            if errorRate < .003:
-                print("less than .003 error")
+            if errorRate < .0003:
+                print("less than .0003 error")
                 break
 
             if iters % 10 == 0:
@@ -299,11 +302,6 @@ class Neural_Network(object):
             if iters % cardinality == 0:
                 images, validation, labels, validationLabels = getData(True)
 
-
-
-            
-        
-
         # plt.xlabel("iteration")
         # plt.ylabel("cost")
         # plt.plot(itersList, costs, 'ro')
@@ -328,21 +326,20 @@ class Neural_Network(object):
         else will return predictions as a list of probabilities of being a 1 (positive result)
         """
         predictions = []
+        # counts = 0
         for image in images:
             pred = self.forward(image, False)
+            # print(pred,1 - float(pred[1]) , 1 - float(pred[1]) > pred[0], 1 - float(pred[1]) - pred[0])
+            # if (1 - float(pred[1]) > pred[0]):
+            #     counts += 1
             if getProbTrue:
-                predictions.append(pred[1])
+                # predictions.append(pred[1]) 
+                predictions.append(1 - pred[0]) #prob of not false = prob of being True (being positive), chosen this way because margin on left is slightly smaller
             else:
                 predictions.append(np.argmax(pred)) #arg min? 
+        # print("COUNTS", counts/float(len(predictions)))
         return predictions
-        #     maxi = float('-inf')
-        #     digit = -1
-        #     for i in range(0, len(pred)):
-        #         if pred[i] > maxi:
-        #             maxi = pred[i]
-        #             digit = i
-        #     predictions.append(digit)
-        # return predictions
+        
 
 
 
@@ -385,14 +382,14 @@ def crossValidate():
 
 def predictOnTestSet():
     """
-    write output of test predictions to file "testPredictions.txt"
+    write output of test predictions to file "predictions.txt"
     """
     global testSet
     training, validation, trainingLabels, validationLabels = getData(True)
     NN = Neural_Network()
     NN.trainNeuralNetwork(training, trainingLabels, validation, validationLabels, "squared")
     testPredictions = NN.predict("", testSet, getProbTrue=True)
-    with open("testPredictions.txt", "w") as f:
+    with open("predictions.txt", "w") as f:
         with open("rap1-lieb-test.txt", "r") as t:
             i = 0
             for line in t.readlines():
