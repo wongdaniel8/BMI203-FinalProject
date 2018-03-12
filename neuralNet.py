@@ -5,8 +5,13 @@ import random
 from scipy import io
 from sklearn import preprocessing, model_selection
 import sys
-# from matplotlib import pyplot as plt
+from matplotlib import pyplot as plt
 
+
+def convertLabel(lab):
+    ar = np.zeros(2)
+    ar[lab] = 1
+    return ar
 
 #preprocessing 
 def getData():
@@ -78,10 +83,16 @@ def getData():
     y = []
     for el in encodedPos:
         X.append(el)
-        y.append(1)
-    for el in encodedNeg[0:137]:
+        y.append(convertLabel(1))
+    ## random.shuffle(encodedNeg)
+    # for el in encodedNeg[0:137]: #training will be 274 total sequences
+    #     X.append(el)
+    #     y.append(0)
+    randomNegs = random.sample(encodedNeg, 137) 
+    for el in randomNegs:
         X.append(el)
-        y.append(0)
+        y.append(convertLabel(0))
+
     
     # flat_X = []
     # for i in range(0, len(X)):
@@ -92,7 +103,7 @@ def getData():
     # X = X.reshape(X, (137*2, 1000))
 
     X = np.array(X, np.int32)
-    print(type(X))
+    print("SSSS", type(X), X.shape)
     y = np.array(y)
 
     # X = np.reshape(X, (137*2, 1000))
@@ -172,8 +183,8 @@ class Neural_Network(object):
     def costFunction(self, X, y):
         #Compute squared error cost for given X, y, use weights already stored in class.
         self.yHat = self.forward(X, True)
-        print(self.yHat.shape, y.shape)
-        J = 0.5 * np.sum(np.square(y - self.yHat))
+        # preds = np.amax(self.yHat, axis=1) #preds will be the 1d array containing the max elements of each forward return
+        J = 0.5 * np.sum(np.square(y - preds))
         return J
 
     def costFunctionPrime(self, X, y, batch):
@@ -218,8 +229,8 @@ class Neural_Network(object):
         itersList = []
         validationAccuracies = []
         costs = []
-        cardinality = 60000
-        while iters < 820000: #820k full cycle
+        cardinality = 274
+        while iters < cardinality * 1000: 
             # print('xiters', iters)
             #STOCHASTIC SINGLE IMAGE
             sample = images[iters % len(images)] 
@@ -233,58 +244,69 @@ class Neural_Network(object):
             iters += 1
             decayStart += 1
             
-            if DONE == False and errorRate < .08:
+            if DONE == False and errorRate < .20:
                 epsilon = epsilon * .6
                 DONE = True
                 decayStart = 1
-            if DONE == True and (decayStart % (5 * cardinality) == 0):
-                epsilon = epsilon * .6
+
+
+            # if DONE == True and (decayStart % (5 * cardinality) == 0):
+            #     epsilon = epsilon * .6
             
-            if costType == "entropy" and errorRate < .11:
-                epsilon = .01
+            # if costType == "entropy" and errorRate < .11:
+            #     epsilon = .01
            
-           
-            
-            # if iters % 40000 == 0:
-            if iters % 400== 0:
+            if iters % 10 == 0:
+            # if iters % cardinality == 0:
                 preds = self.predict("", validation)
                 print(preds)
                 mistakes = 0
                 for i in range(0, len(preds)):
-                    if preds[i] != validationLabels[i]:
+
+                    if preds[i] != np.argmax(validationLabels[i]):
                         mistakes += 1
                 errorRate = mistakes / float(len(preds))
                 print("iteration: ", iters, "epsilon: ", epsilon, " val error rate: ", mistakes / float(len(preds)))
                 validationAccuracies.append(1 - errorRate)
             
-            # if iters % 40000 == 0:
-            if iters % 400 == 0:
+            if iters % 10 == 0:
+            # if iters % cardinality  == 0:
                 preds = self.predict("", images)
                 mistakes = 0
                 for i in range(0, len(preds)):
-                    if preds[i] != labels[i]:
+                    if preds[i] != np.argmax(labels[i]):
                         mistakes += 1
                 errorRate = mistakes / float(len(preds))
                 print("iteration: ", iters, "epsilon: ", epsilon, " training error rate: ", mistakes / float(len(preds)))
                 trainingErrors.append(errorRate)
                 itersList.append(iters)
 
-            if iters % 40000== 0:
-                if costType == "squared":
-                    cost = self.costFunction(images, labels)
-                    costs.append(cost)
-                else:
-                    cost = self.crossEntropyCost(images, labels) #PASSING IN ALL IMAGES TO COMPUTE COST
-                    costs.append(cost)
-                print("COST", cost) 
+            # if iters % cardinality == 0:
+
+            #     if costType == "squared":
+            #         cost = self.costFunction(images, labels)
+            #         costs.append(cost)
+            #     else:
+            #         cost = self.crossEntropyCost(images, labels) #PASSING IN ALL IMAGES TO COMPUTE COST
+            #         costs.append(cost)
+            #     print("COST", cost) 
+
+            if iters % cardinality == 0:
+                images, validation, labels, validationLabels = getData()
+
+
+
+            if errorRate < .01:
+                print("less than .01 error")
+                break
         
         # np.save("V3.npy", self.V)
         # np.save("W3.npy", self.W)
 
-        plt.xlabel("iteration")
-        plt.ylabel("cost")
-        plt.plot(itersList, costs, 'ro')
-        plt.show()
+        # plt.xlabel("iteration")
+        # plt.ylabel("cost")
+        # plt.plot(itersList, costs, 'ro')
+        # plt.show()
 
         plt.xlabel("iteration")
         plt.ylabel("training error")
@@ -306,14 +328,16 @@ class Neural_Network(object):
         predictions = []
         for image in images:
             pred = self.forward(image, False)
-            maxi = float('-inf')
-            digit = -1
-            for i in range(0, len(pred)):
-                if pred[i] > maxi:
-                    maxi = pred[i]
-                    digit = i
-            predictions.append(digit)
+            predictions.append(np.argmax(pred)) #arg min? 
         return predictions
+        #     maxi = float('-inf')
+        #     digit = -1
+        #     for i in range(0, len(pred)):
+        #         if pred[i] > maxi:
+        #             maxi = pred[i]
+        #             digit = i
+        #     predictions.append(digit)
+        # return predictions
 
 
 
@@ -330,7 +354,7 @@ def validate(costType):
     predictions = NN.predict("", validation)
     mistakes = 0
     for i in range(0, len(predictions)):
-        if predictions[i] != validationLabels[i]:
+        if predictions[i] != np.argmax(validationLabels[i]):
             mistakes += 1
     print("error rate: ", mistakes / float(len(predictions)))
     return NN
