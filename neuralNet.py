@@ -191,7 +191,6 @@ class Neural_Network(object):
     def costFunction(self, X, y):
         #Compute squared error cost for given X, y, use weights already stored in class.
         self.yHat = self.forward(X, True)
-        # preds = np.amax(self.yHat, axis=1) #preds will be the 1d array containing the max elements of each forward return
         J = 0.5 * np.sum(np.square(y - self.yHat))
         return J
 
@@ -275,8 +274,8 @@ class Neural_Network(object):
             
             if errorRate < .036:
                 print("less than .036 validation error")
-                avg = crossValidate(self, verbose=False)
-                if avg < .067:
+                avg = crossValidate(self, np.concatenate((images, validation)), np.concatenate((labels, validationLabels)), verbose=False)
+                if avg < .088:
                     break
 
 
@@ -292,14 +291,15 @@ class Neural_Network(object):
 
 
             #resample training data to include different negatives each epoch
-            if iters % cardinality == 0:
-                images, null, labels, null = getData(True)
+            # if iters % cardinality == 0:
+            #     images, null, labels, null = getData(True)
             
-            if iters % (cardinality/2) == 0:
-                print("epsilon", epsilon)
-                avg = crossValidate(self, verbose=False)
-                if avg < .067:
-                    break
+            # if iters % (cardinality/2) == 0:
+            #     print("epsilon", epsilon)
+            #     avg = crossValidate(self, np.concatenate((images, validation)), np.concatenate((labels, validationLabels)), verbose=False)
+            #     if avg < .067:
+            #         break
+
         return self.V, self.W
 
     def predict(self, weights, images, getProbTrue=False):
@@ -324,6 +324,9 @@ class Neural_Network(object):
 
 def getNN(costType):
     training, validation, trainingLabels, validationLabels = getData(True)
+    print(training.shape, validation.shape)
+    X = np.concatenate((training, validation),axis=0)
+    y = np.concatenate((trainingLabels, validationLabels))
     if costType == "squared":
         NN = Neural_Network()
         NN.trainNeuralNetwork(training, trainingLabels, validation, validationLabels, "squared", verbose=True)
@@ -337,15 +340,16 @@ def getNN(costType):
         if predictions[i] != np.argmax(validationLabels[i]):
             mistakes += 1
     print("final error rate on validation: ", mistakes / float(len(predictions)))
-    crossValidate(NN, False)
+    print("final k fold")
+    crossValidate(NN, X, y, False)
     return NN
 
-def crossValidate(NN, verbose=False):
+def crossValidate(NN, X, y, verbose=False):
     """
     performs cross validation with an input neural network, prints results
     """
     folds = []
-    X, y = getData(split=False)
+    # X, y = getData(split=False)
     kf = model_selection.KFold(n_splits=10, random_state=None, shuffle=True)
     for train_index, test_index in kf.split(X):
         X_train, X_test = X[train_index], X[test_index]
@@ -374,17 +378,18 @@ def predictOnTestSet():
                 i+=1
 
 NN = getNN("squared")
+
 # crossValidate()
 # predictOnTestSet()
 
 # Notes:
 # 274 total size of set (training + validation test)
-# with validation/test set size of 10%, 1 seq error = .0375 error rate
+# with validation/test set size of 10%, 1 seq error = .0357 error rate
 
 # predictions file rn:
-# average k fold 0.06190476190476191
-# final error rate on validation:  0.10714285714285714
-# average k fold 0.08082010582010582
+# final error rate on validation:  0.03571428571428571
+# final k fold
+# average k fold 0.07711640211640211
 
 
 
