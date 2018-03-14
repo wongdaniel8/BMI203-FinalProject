@@ -1,7 +1,6 @@
 import random
 import numpy as np
 from sklearn import preprocessing, model_selection
-import sys
 
 testSet = []
 full = []
