@@ -1,10 +1,7 @@
 import random
 import numpy as np
-import random
-from scipy import io
 from sklearn import preprocessing, model_selection
 import sys
-from matplotlib import pyplot as plt
 
 testSet = []
 full = []
