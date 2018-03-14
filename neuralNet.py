@@ -220,9 +220,6 @@ class Neural_Network(object):
 
 
     def trainNeuralNetwork(self, sequences, labels, validation, validationLabels, costType,verbose=True):
-        # print("V: ", self.V)
-        # print("W: ", self.W)
-        # print("lengths: ", len(sequences), len(labels), len(validation))
         errorRate = 1
         DONE = False
         iters = 0
