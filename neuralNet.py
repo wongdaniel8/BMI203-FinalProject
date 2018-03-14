@@ -371,8 +371,8 @@ def autoencoder():
     return predictions
 
 
-# autoencoder()
-NN = getNN("squared")
+autoencoder()
+# NN = getNN("squared")
 # crossValidate()
 # predictOnTestSet()
 
