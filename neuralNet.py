@@ -1,3 +1,4 @@
+from Bio import SeqIO
 import random
 import numpy as np
 from sklearn import preprocessing, model_selection
@@ -132,7 +133,7 @@ class Neural_Network(object):
         #Define Hyperparameters
         self.inputLayerSize = 1000 + 1
         self.outputLayerSize = 2
-        self.hiddenLayerSize = 100 + 1
+        self.hiddenLayerSize = 200 + 1
 
         #define layers and activations
         self.x = [] #input layer
@@ -340,7 +341,7 @@ def predictOnTestSet():
     print("test on all ordered")
     print(NN.predict("", full))
     testPredictions = NN.predict("", testSet, getProbTrue=True)
-    with open("predictions_new3.txt", "w") as f:
+    with open("predictions_new.txt", "w") as f:
         with open("rap1-lieb-test.txt", "r") as t:
             i = 0
             for line in t.readlines():
@@ -370,8 +371,8 @@ def autoencoder():
     return predictions
 
 
-autoencoder()
-# NN = getNN("squared")
+# autoencoder()
+NN = getNN("squared")
 # crossValidate()
 # predictOnTestSet()
 
