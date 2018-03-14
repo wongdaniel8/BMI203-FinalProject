@@ -1,4 +1,3 @@
-from Bio import SeqIO
 import random
 import numpy as np
 import random
@@ -375,6 +374,7 @@ def autoencoder():
     NN.trainNeuralNetwork(X, y, validation, validationLabels, "squared", verbose=True)
     predictions = NN.predict("", X)
     print("predictions (should be ordered 0->7):",predictions)
+    return predictions
 
 
 autoencoder()
