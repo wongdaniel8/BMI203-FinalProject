@@ -377,7 +377,7 @@ def autoencoder():
     print("predictions (should be ordered 0->7):",predictions)
 
 
-# autoencoder()
+autoencoder()
 # NN = getNN("squared")
 # crossValidate()
 # predictOnTestSet()
